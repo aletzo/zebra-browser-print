@@ -1,0 +1,196 @@
+<html>
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<head>
+    <style>
+        body {
+            font-family: -apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+        }
+        textarea {
+            font-family: Courier;
+        }
+        textarea:read-only {
+            background: #eaeaea;
+        }
+    </style>
+</head>
+<body>
+
+    <span style="padding-right:50px; font-size:200%">Zebra Browser Print Test Page</span><br/>
+    <span style="font-size:75%">This page must be loaded from a web server to function properly.</span><br><br>
+    Selected Device: <select id="selected_device" onchange=onDeviceSelected(this);></select> <br/><br/> 
+    <input type="button" value="Get Application Configuration" onclick="getConfig()"><br/><br/>
+    <input type="button" value="Send Config Label" onclick="sendCommand('~wc')"><br/><br/>
+    <input type="button" value="Send ZPL Label" onclick="sendCommand('^XA^FO200,200^A0N36,36^FDTest Label^FS^XZ')"><br/><br/>
+    <input type="button" value="Get Status" onclick="sendCommand('~hs'); readResponse()"><br/><br/>
+    <input type="button" value="Get Local Devices" onclick="BrowserPrint.getLocalDevices(getDeviceCallback, errorCallback);"><br/><br/>
+
+    <br>
+
+    <textarea id="commands" style="height:200px;width:400px">
+^XA
+^RS8          
+^RFR,H,0,8,E  
+^FN1          
+^FS           
+^HV1,64,[,],F 
+^FS
+^XZ
+    </textarea>
+
+    <br>
+    <br>
+
+    <div id="commands">
+        <input type="button" value="CALIBRATE"                   onclick="document.querySelector('#commands').value = RFID_COMMANDS.CALIBRATE">
+        <input type="button" value="ERROR_RESPONSE"              onclick="document.querySelector('#commands').value = RFID_COMMANDS.ERROR_RESPONSE">
+        <input type="button" value="EXECUTE"                     onclick="document.querySelector('#commands').value = RFID_COMMANDS.EXECUTE">
+        <input type="button" value="GET_CONTENT"                 onclick="document.querySelector('#commands').value = RFID_COMMANDS.GET_CONTENT">
+        <input type="button" value="GET_LINE1"                   onclick="document.querySelector('#commands').value = RFID_COMMANDS.GET_LINE1">
+        <input type="button" value="SET_CONTENT_EPC"             onclick="document.querySelector('#commands').value = RFID_COMMANDS.SET_CONTENT_EPC">
+        <input type="button" value="SET_CONTENT_TID_INFORMATION" onclick="document.querySelector('#commands').value = RFID_COMMANDS.SET_CONTENT_TID_INFORMATION">
+    </div>
+
+    <br>
+
+    <input type="button" style="font-size:100px;height:100px;width:400px" value="send"          onclick="sendCommand(document.querySelector('#commands').value)">
+    <br>                                                                  
+    <br>                                                                  
+    <input type="button" style="font-size:100px;height:100px;width:400px" value="send and read" onclick="sendCommand(document.querySelector('#commands').value);readResponse()">
+    <br>                                                                  
+    <br>                                                                  
+    <input type="button" style="font-size:100px;height:100px;width:400px" value="read"          onclick="readResponse()">
+
+    <br>
+    <br>
+
+    <textarea id="output" style="height:200px;width:400px" readonly></textarea>
+
+    <script type="text/javascript" src="BrowserPrint-2.0.0.75.min.js"></script>
+    <script type="text/javascript">
+        const RFID_COMMANDS = {
+            CALIBRATE                   : '! U1 setvar "rfid.tag.calibrate" "run"',
+            ERROR_RESPONSE              : '! U1 getvar "rfid.error.response"',
+            EXECUTE                     : '! U1 setvar "rfid.tag.read.execute"',
+            GET_CONTENT                 : '! U1 getvar "rfid.tag.read.content"',
+            GET_LINE1                   : '! U1 setvar "rfid.tag.read.result_line1"',
+            SET_CONTENT_EPC             : '! U1 setvar "rfid.tag.read.content" "epc"',
+            SET_CONTENT_TID_INFORMATION : '! U1 setvar "rfid.tag.read.content" "tid information"',
+        }
+
+        var selected_device;
+        var devices = [];
+        function setup()
+        {
+	        //Get the default device from the application as a first step. Discovery takes longer to complete.
+	        BrowserPrint.getDefaultDevice("printer", function(device)
+			        {
+		        
+				        //Add device to list of devices and to html select element
+				        selected_device = device;
+				        devices.push(device);
+				        var html_select = document.getElementById("selected_device");
+				        var option = document.createElement("option");
+				        option.text = device.name;
+				        html_select.add(option);
+				        
+				        //Discover any other devices available to the application
+				        BrowserPrint.getLocalDevices(function(device_list){
+					        for(var i = 0; i < device_list.length; i++)
+					        {
+						        //Add device to list of devices and to html select element
+						        var device = device_list[i];
+						        if(!selected_device || device.uid != selected_device.uid)
+						        {
+							        devices.push(device);
+							        var option = document.createElement("option");
+							        option.text = device.name;
+							        option.value = device.uid;
+							        html_select.add(option);
+						        }
+					        }
+					        
+				        }, function(){alert("Error getting local devices")},"printer");
+				        
+			        }, function(error){
+				        alert(error);
+			        })
+        }
+        function getConfig(){
+	        BrowserPrint.getApplicationConfiguration(function(config){
+		        alert(JSON.stringify(config))
+	        }, function(error){
+		        alert(JSON.stringify(new BrowserPrint.ApplicationConfiguration()));
+	        })
+        }
+        function sendCommand(command)
+        {
+console.log('command');
+console.log(command);
+	        selected_device.send(command, undefined, errorCallback);
+        }
+        var readCallback = function(response) {
+
+console.log('response');
+console.log(response);
+
+	        let message
+
+	        if(response === undefined || response === null || response === "")
+	        {
+		        message = 'No Response from Device'
+	        }
+	        else
+	        {
+		        message = response
+	        }
+
+	        const outputTextarea = document.querySelector('#output')
+
+	        outputTextarea.value += '\n' + message
+
+            outputTextarea.scrollTop = outputTextarea.scrollHeight
+	        
+        }
+
+        var errorCallback = function(errorMessage){
+	        alert("Error: " + errorMessage);	
+        }
+        function readResponse()
+        {
+
+	        selected_device.read(readCallback, errorCallback);
+	        
+        }
+        function getDeviceCallback(deviceList)
+        {
+	        alert("Devices: \n" + JSON.stringify(deviceList, null, 4))
+        }
+
+        function sendImage(imageUrl)
+        {
+	        url = window.location.href.substring(0, window.location.href.lastIndexOf("/"));
+	        url = url + "/" + imageUrl;
+	        selected_device.sendUrl(url, undefined, errorCallback)
+        }
+        function sendImageHttp(imageUrl)
+        {
+	        url = window.location.href.substring(0, window.location.href.lastIndexOf("/"));
+	        url = url + "/" + imageUrl;
+	        url = url.replace("https", "http");
+	        selected_device.sendUrl(url, undefined, errorCallback)
+        }
+        function onDeviceSelected(selected)
+        {
+	        for(var i = 0; i < devices.length; ++i){
+		        if(selected.value == devices[i].uid)
+		        {
+			        selected_device = devices[i];
+			        return;
+		        }
+	        }
+        }
+        window.onload = setup;
+    </script>
+</body>
+</html>
+
